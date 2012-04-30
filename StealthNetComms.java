@@ -48,6 +48,8 @@ public class StealthNetComms {
     private SecretKey sKey;
     private TripleDESEncrypter encrypter;
     private SecureRandom random;
+    
+    public byte[] currentNonce;
 
     
     public StealthNetComms() {
@@ -120,7 +122,15 @@ public class StealthNetComms {
             
             // Generate the secret key
             SecretKey secretKey = ka.generateSecret(algorithm);
-            sKey = secretKey;
+            byte [] secretBytes = ka.generateSecret();
+            MessageDigest md = MessageDigest.getInstance("SHA-1");
+            md.reset();
+            md.update(secretBytes);
+            byte [] secretKeyBytes = secretKey.getEncoded();
+            byte [] digest = md.digest();
+            System.arraycopy(secretKeyBytes, 0, digest, digest.length, secretKeyBytes.length);
+            SecretKeySpec secretKeyFromBytes = new SecretKeySpec(digest, algorithm);
+            sKey = secretKeyFromBytes;
             encrypter = new TripleDESEncrypter(sKey);
 
             SecureRandom r = new SecureRandom();
@@ -186,6 +196,10 @@ public class StealthNetComms {
         String str = pckt.toString();
         //Generates the MAC for the message
         try {
+        	//TODO: prepend nonce to string, 8 sequential bytes fed through PRNG, covers 10^8 messages
+        	SecureRandom rand = new SecureRandom();
+        	byte [] random = rand.generateSeed(6);
+        	
     		Mac mac = Mac.getInstance("HmacMD5");
     	   	mac.init(sKey);
     	   	byte[] utf8 = str.getBytes("UTF8");
@@ -292,7 +306,15 @@ public class StealthNetComms {
             
             // Generate the secret key
             SecretKey secretKey = ka.generateSecret(algorithm);
-            sKey = secretKey;
+            byte [] secretBytes = ka.generateSecret();
+            MessageDigest md = MessageDigest.getInstance("SHA-1");
+            md.reset();
+            md.update(secretBytes);
+            byte [] secretKeyBytes = secretKey.getEncoded();
+            byte [] digest = md.digest();
+            System.arraycopy(secretKeyBytes, 0, digest, digest.length, secretKeyBytes.length);
+            SecretKeySpec secretKeyFromBytes = new SecretKeySpec(digest, algorithm);
+            sKey = secretKeyFromBytes;
             encrypter = new TripleDESEncrypter(sKey);
             
             String randomSeed = dataIn.readLine();
