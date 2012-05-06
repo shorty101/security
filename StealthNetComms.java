@@ -32,6 +32,8 @@ import javax.crypto.spec.*;
 import java.security.*;
 import java.security.spec.*;
 import javax.crypto.interfaces.*;
+import javax.xml.bind.annotation.adapters.HexBinaryAdapter;
+
 import java.io.*;
 import java.math.*;
 
@@ -48,11 +50,16 @@ public class StealthNetComms {
 	private SecretKey sKey;
 	private TripleDESEncrypter encrypter;
 	private SecureRandom random;
+	private long nonce;
+	private boolean nonceSet;
 
 	public StealthNetComms() {
 		commsSocket = null;
 		dataIn = null;
 		dataOut = null;
+		//byte[] bytea = {0x0, 0x0};
+		nonce = 0;
+		nonceSet = false;
 	}
 
 	protected void finalize() throws IOException {
@@ -187,30 +194,61 @@ public class StealthNetComms {
 	public boolean sendPacket(StealthNetPacket pckt) {
 		if (dataOut == null)
 			return false;
-		String str = pckt.toString();
+		byte randhead[] = new byte[8];
+		SecureRandom sr = new SecureRandom();
+		sr.nextBytes(randhead);
+		String str = randhead.toString();
+		str.concat(pckt.toString());
+		System.out.println("snd message: " + pckt.toString());
+
+		
 		// Generates the MAC for the message
 		try {
-			Mac mac = Mac.getInstance("HmacMD5");
+	        //MessageDigest md = MessageDigest.getInstance("SHA-1");
+	        //md.reset();
+	        //md.update(nonce);
+	        //nonce = new BigInteger(1, md.digest())
+			nonce++;
+			nonce = nonce % Long.MAX_VALUE;
+	        Mac mac = Mac.getInstance("HmacMD5");
 			mac.init(sKey);
 			byte[] utf8 = str.getBytes("UTF8");
 			byte[] digest = mac.doFinal(utf8);
 			String digestB64 = javax.xml.bind.DatatypeConverter
 					.printBase64Binary(digest);
+
+			System.out.println("snd message: " + str);
+			System.out.println("snd nonce: " + Long.toHexString(nonce));
+			//System.out.println("curr nonce: " + Long.toHexString(nonce));
+			System.out.println("snd MAC: " + digestB64);
+			str = str.concat(Long.toHexString(nonce));
 			str = str.concat(digestB64);
+			System.out.println("snd str: " + str);
 		} catch (NoSuchAlgorithmException e) {
 		} catch (InvalidKeyException e) {
 		} catch (UnsupportedEncodingException e) {
 		}
+		
 		dataOut.println(encrypter.encrypt(str, random));
 		return true;
 	}
 
 	public StealthNetPacket recvPacket() throws IOException {
+		int macOffset = 24;
+		int nonceOffset = 16; //40 byte hex representation. Inefficient, but don't have to deal with NULL etc
+		int baseOffset = 8; //8 bytes random header for entropy
 		StealthNetPacket pckt = null;
 		String str = dataIn.readLine();
 		String decrypted = encrypter.decrypt(str, random);
-		String MAC = decrypted.substring(decrypted.length() - 24);
-		String message = decrypted.substring(0, decrypted.length() - 24);
+		String MAC = decrypted.substring(decrypted.length() - macOffset, decrypted.length());
+		String messageNonce = decrypted.substring(
+				decrypted.length() - macOffset - nonceOffset, decrypted.length() - macOffset);
+		String message = decrypted.substring(baseOffset, decrypted.length() - macOffset - nonceOffset);
+		System.out.println("rcv str: " + decrypted);
+		System.out.println("rcv message: " + message);
+		System.out.println("rcv nonce: " + messageNonce);
+		System.out.println("rcv MAC: " + MAC);
+		
 		try {
 			// Checks the MAC against the message
 			Mac mac = Mac.getInstance("HmacMD5");
@@ -221,10 +259,31 @@ public class StealthNetComms {
 					.printBase64Binary(digest);
 			if (digestB64.equals(MAC)) {
 			} else {
-				System.out
-						.println("String has been altered, communication line unsafe.");
+				System.err.println("Incoming message altered (invalid hash), communication line unsafe.");
+				System.err.println("hash " + digestB64 + " expected " + MAC);
 				System.exit(1);
 			}
+	        //MessageDigest md = MessageDigest.getInstance("SHA-1");
+	        //md.reset();
+	        //md.update(nonce);
+	        //String nonce16 = String.format("%x", new BigInteger(1, md.digest()));
+	        if (Long.toHexString(nonce+1) == messageNonce) {
+	        	//nonce = md.digest();
+	        	nonce++;
+	        } else if (!nonceSet) {
+	        	nonceSet = true;
+	            //HexBinaryAdapter adapter = new HexBinaryAdapter();
+	            //nonce = adapter.unmarshal(messageNonce);
+	        	nonce = Long.parseLong(messageNonce,16);
+	        	System.out.println("setting nonce to " + Long.toHexString(nonce));
+		        //nonce16 = String.format("%x", new BigInteger(1, nonce));
+	        	//System.out.println("New nonce 16 " + nonce16);
+	        } else {
+				System.err.println("Incoming message altered (invalid nonce), communication line unsafe.");
+				System.err.println("incoming " + messageNonce + ".");
+				System.err.println("expected " + Long.toHexString(nonce) +". current " + nonce);
+				System.exit(1);
+	        }
 		} catch (NoSuchAlgorithmException e) {
 		} catch (InvalidKeyException e) {
 		} catch (UnsupportedEncodingException e) {
@@ -307,11 +366,22 @@ public class StealthNetComms {
 			SecretKey secretKey = ka.generateSecret(algorithm);
 			sKey = secretKey;
 			encrypter = new TripleDESEncrypter(sKey);
+			
+			//byte [] secretBytes = ka.generateSecret();
+            MessageDigest md = MessageDigest.getInstance("SHA-1");
+            md.reset();
+            md.update(secretKey.getEncoded());
+            
+            //nonce = md.digest();
+            //nonce = 
+            
 
 			String randomSeed = dataIn.readLine();
 			byte[] seed = javax.xml.bind.DatatypeConverter
 					.parseBase64Binary(encrypter.decrypt(randomSeed));
 			random = new SecureRandom(seed);
+			nonce = random.nextLong();
+			nonceSet = true;
 			return;
 		} catch (InvalidKeySpecException e) {
 		} catch (InvalidKeyException e) {
