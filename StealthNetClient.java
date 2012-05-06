@@ -26,6 +26,7 @@ import javax.swing.*;
 import javax.swing.table.*;
 import java.awt.*;
 import java.awt.event.*;
+import java.security.SecureRandom;
 import java.util.Hashtable;
 
 /* StealthNetClient Class Definition *****************************************/
@@ -56,6 +57,10 @@ public class StealthNetClient {
         });
     }
 
+    public String getUserID(){
+    	return userID;
+    }
+    
     public Component createGUI() {
         JPanel pane = new JPanel();
             	

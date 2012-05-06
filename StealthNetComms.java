@@ -147,6 +147,10 @@ public class StealthNetComms {
 		}
 		return true;
 	}
+	
+/*	public SecretKey getKey(String user, File file){
+		
+	}*/
 
 	public boolean terminateSession() {
 		try {
@@ -320,6 +324,7 @@ public class StealthNetComms {
 		} catch (IOException e) {
 		}
 	}
+	
 }
 
 /*******************************************************************************
