@@ -31,8 +31,9 @@ import javax.crypto.*;
 import javax.crypto.spec.*;
 import java.security.*;
 import java.security.spec.*;
+import java.util.Date;
+
 import javax.crypto.interfaces.*;
-import javax.xml.bind.annotation.adapters.HexBinaryAdapter;
 
 import java.io.*;
 import java.math.*;
@@ -42,6 +43,7 @@ import java.math.*;
 public class StealthNetComms {
 	public static final String SERVERNAME = "localhost";
 	public static final int SERVERPORT = 5616;
+	public static final String STRSEP = ",";
 
 	private Socket commsSocket; // communications socket
 	private PrintWriter dataOut; // output data stream
@@ -52,6 +54,8 @@ public class StealthNetComms {
 	private SecureRandom random;
 	private long nonce;
 	private boolean nonceSet;
+	private long othernonce;
+	private long lastdate;
 
 	public StealthNetComms() {
 		commsSocket = null;
@@ -59,6 +63,7 @@ public class StealthNetComms {
 		dataOut = null;
 		//byte[] bytea = {0x0, 0x0};
 		nonce = 0;
+		othernonce = 0;
 		nonceSet = false;
 	}
 
@@ -194,34 +199,38 @@ public class StealthNetComms {
 	public boolean sendPacket(StealthNetPacket pckt) {
 		if (dataOut == null)
 			return false;
-		byte randhead[] = new byte[8];
+		//byte randhead[] = new byte[8];
+		//Random header for entropy
 		SecureRandom sr = new SecureRandom();
-		sr.nextBytes(randhead);
-		String str = randhead.toString();
-		str.concat(pckt.toString());
-		System.out.println("snd message: " + pckt.toString());
-
-		
+		String str = Long.toHexString(sr.nextLong()).substring(0, 8); //Random header
+		str = str.concat(STRSEP);
+		str = str.concat(pckt.toString());
+		str = str.concat(STRSEP);
+		Date date = new Date();
+		str = str.concat(Long.toHexString(date.getTime()));
+		str = str.concat(STRSEP);
 		// Generates the MAC for the message
 		try {
-	        //MessageDigest md = MessageDigest.getInstance("SHA-1");
-	        //md.reset();
-	        //md.update(nonce);
-	        //nonce = new BigInteger(1, md.digest())
+			if (nonce == 0) {
+				nonce = sr.nextLong();
+			}
 			nonce++;
 			nonce = nonce % Long.MAX_VALUE;
+	        MessageDigest md = MessageDigest.getInstance("SHA-1");
+			md.update((byte) nonce);
+	        byte[] nonceDigest = md.digest();
+			String nonceB64 = javax.xml.bind.DatatypeConverter
+					.printBase64Binary(nonceDigest);
 	        Mac mac = Mac.getInstance("HmacMD5");
 			mac.init(sKey);
-			byte[] utf8 = str.getBytes("UTF8");
+			byte[] utf8 = pckt.toString().getBytes("UTF8");
 			byte[] digest = mac.doFinal(utf8);
 			String digestB64 = javax.xml.bind.DatatypeConverter
 					.printBase64Binary(digest);
-
-			System.out.println("snd message: " + str);
-			System.out.println("snd nonce: " + Long.toHexString(nonce));
-			//System.out.println("curr nonce: " + Long.toHexString(nonce));
-			System.out.println("snd MAC: " + digestB64);
 			str = str.concat(Long.toHexString(nonce));
+			str = str.concat(STRSEP);
+			str = str.concat(nonceB64);
+			str = str.concat(STRSEP);
 			str = str.concat(digestB64);
 			System.out.println("snd str: " + str);
 		} catch (NoSuchAlgorithmException e) {
@@ -234,20 +243,24 @@ public class StealthNetComms {
 	}
 
 	public StealthNetPacket recvPacket() throws IOException {
-		int macOffset = 24;
-		int nonceOffset = 16; //40 byte hex representation. Inefficient, but don't have to deal with NULL etc
-		int baseOffset = 8; //8 bytes random header for entropy
+		
+		//int macOffset = 24;
+		//int nonceOffset = 16; //40 byte hex representation. Inefficient, but don't have to deal with NULL etc
+		//int baseOffset = 8; //8 bytes random header for entropy
 		StealthNetPacket pckt = null;
 		String str = dataIn.readLine();
 		String decrypted = encrypter.decrypt(str, random);
-		String MAC = decrypted.substring(decrypted.length() - macOffset, decrypted.length());
-		String messageNonce = decrypted.substring(
-				decrypted.length() - macOffset - nonceOffset, decrypted.length() - macOffset);
-		String message = decrypted.substring(baseOffset, decrypted.length() - macOffset - nonceOffset);
+		decrypted = decrypted.substring(8); //Not a hack; no magic numbers here!
+		if (decrypted.charAt(0) == ',') {
+			decrypted = decrypted.substring(1);
+		}
+		String[] sarr = decrypted.split(STRSEP);
+		String message = sarr[0];
+		long messageDate = new BigInteger(sarr[1], 16).longValue();
+		String messageNonce = sarr[2];
+		String messageNonceB64 = sarr[3];
+		String MAC = sarr[4];
 		System.out.println("rcv str: " + decrypted);
-		System.out.println("rcv message: " + message);
-		System.out.println("rcv nonce: " + messageNonce);
-		System.out.println("rcv MAC: " + MAC);
 		
 		try {
 			// Checks the MAC against the message
@@ -263,27 +276,38 @@ public class StealthNetComms {
 				System.err.println("hash " + digestB64 + " expected " + MAC);
 				System.exit(1);
 			}
-	        //MessageDigest md = MessageDigest.getInstance("SHA-1");
-	        //md.reset();
-	        //md.update(nonce);
-	        //String nonce16 = String.format("%x", new BigInteger(1, md.digest()));
-	        if (Long.toHexString(nonce+1) == messageNonce) {
-	        	//nonce = md.digest();
-	        	nonce++;
-	        } else if (!nonceSet) {
+	        long noncein = new BigInteger(messageNonce, 16).longValue();
+			if (othernonce+1 == noncein) {
+	        	othernonce++;
+	        } else if (othernonce == 0) {
 	        	nonceSet = true;
-	            //HexBinaryAdapter adapter = new HexBinaryAdapter();
-	            //nonce = adapter.unmarshal(messageNonce);
-	        	nonce = Long.parseLong(messageNonce,16);
-	        	System.out.println("setting nonce to " + Long.toHexString(nonce));
+	        	othernonce = new BigInteger(messageNonce, 16).longValue();
+	        	System.out.println("setting othernonce to " + Long.toHexString(othernonce));
 		        //nonce16 = String.format("%x", new BigInteger(1, nonce));
 	        	//System.out.println("New nonce 16 " + nonce16);
 	        } else {
 				System.err.println("Incoming message altered (invalid nonce), communication line unsafe.");
 				System.err.println("incoming " + messageNonce + ".");
-				System.err.println("expected " + Long.toHexString(nonce) +". current " + nonce);
-				System.exit(1);
+				System.err.println("other +1 " + Long.toHexString(othernonce+1) +". current " + Long.toHexString(othernonce));
+				//System.exit(1);
 	        }
+			MessageDigest md = MessageDigest.getInstance("SHA-1");
+	        md.update((byte) (othernonce)); //Not +1, we just set it to the current.
+	        byte[] nonceDigest = md.digest();
+			String nonceB64 = javax.xml.bind.DatatypeConverter
+					.printBase64Binary(nonceDigest);
+			if (messageNonceB64.equals(nonceB64)) {
+			} else {
+				System.err.println("Incoming message altered (invalid nonce hash), communication line unsafe.");
+				System.err.println("incoming " + messageNonceB64 + ".");
+				System.err.println("expected " + nonceB64 +". othernonce " + Long.toHexString(othernonce));
+				//System.exit(1);
+			}
+			if (lastdate == 0 || lastdate <= messageDate) { //Hack, needs nano
+				lastdate = messageDate;
+			} else {
+				System.err.println("Timestamp invalid: message from " + messageDate + " before " + lastdate);
+			}
 		} catch (NoSuchAlgorithmException e) {
 		} catch (InvalidKeyException e) {
 		} catch (UnsupportedEncodingException e) {
