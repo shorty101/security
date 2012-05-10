@@ -356,7 +356,6 @@ public class StealthNetComms {
 	public SecretKey getSecretKey(String userID){
 		try {
 			File keyFile = StealthNetClient.clientKeyFile;
-			PublicKey clientPubKey = StealthNetClient.publicKey;
 			FileInputStream fstream = new FileInputStream(keyFile.getPath());
 			DataInputStream in = new DataInputStream(fstream);
 			BufferedReader br = new BufferedReader(new InputStreamReader(in));
@@ -370,19 +369,10 @@ public class StealthNetComms {
 			for (int i = 0; i < userLines.length; i++){
 				String[] userInfo = userLines[i].split(",");
 				if (userInfo[0] == userID){
-					byte[] privateKeyBytes = javax.xml.bind.DatatypeConverter
+					byte[] secretKeyBytes = javax.xml.bind.DatatypeConverter
 					.parseBase64Binary(userInfo[2]);
-					KeyAgreement ka = KeyAgreement.getInstance("DH");
-					PrivateKey privateKey = privateKeyBytes;
-					ka.init(privateKey);
-					ka.doPhase(clientPubKey, true);
-
-					// Specify the type of key to generate;
-					String algorithm = "DESede";
-
-					// Generate the secret key
-					SecretKey secretKey = ka.generateSecret(algorithm);
-					sKey = secretKey;
+					SecretKeySpec sKeySpec = new SecretKeySpec(secretKeyBytes, "DESede");
+					sKey = sKeySpec;
 					encrypter = new TripleDESEncrypter(sKey);
 				}
 			}

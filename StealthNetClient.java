@@ -526,13 +526,23 @@ public class StealthNetClient {
 			PublicKey publickey = keypair.getPublic();
 			publicKey = publickey;
 			
-			byte[] privateKeyBytes = privatekey.getEncoded();
+			KeyAgreement ka = KeyAgreement.getInstance("DH");
+			ka.init(privatekey);
+			ka.doPhase(publicKey, true);
+
+			// Specify the type of key to generate;
+			String algorithm = "DESede";
+
+			// Generate the secret key
+			SecretKey secretKey = ka.generateSecret(algorithm);
+			
+			byte[] secretKeyBytes = secretKey.getEncoded();
 			String server = "Server";
 			String pubKey = javax.xml.bind.DatatypeConverter.printBase64Binary(serverPublicKey.getEncoded());
-			String privKey = javax.xml.bind.DatatypeConverter.printBase64Binary(privateKeyBytes);
+			String secKey = javax.xml.bind.DatatypeConverter.printBase64Binary(secretKeyBytes);
 			String seperator = ",";
 			FileOutputStream fos = new FileOutputStream("C:/Users/Andrew/Desktop/" + userID + "KeyFile.txt");
-			String output = server + seperator + pubKey + seperator + privKey + seperator + seperator;
+			String output = server + seperator + pubKey + seperator + secKey + seperator + seperator;
 			byte[] toWrite = output.getBytes();
 			
 			fos.write(toWrite);
