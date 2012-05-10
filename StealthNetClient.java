@@ -21,11 +21,20 @@
 /* Import Libraries **********************************************************/
 
 import java.io.*;
+import java.math.BigInteger;
 import java.net.*;
+
+import javax.crypto.*;
+import javax.crypto.interfaces.DHKey;
+import javax.crypto.spec.DHParameterSpec;
 import javax.swing.*;
 import javax.swing.table.*;
 import java.awt.*;
 import java.awt.event.*;
+import java.security.KeyPair;
+import java.security.KeyPairGenerator;
+import java.security.PrivateKey;
+import java.security.PublicKey;
 import java.security.SecureRandom;
 import java.util.Hashtable;
 
@@ -40,6 +49,8 @@ public class StealthNetClient {
     private String userID = null;
     private JTable buddyTable = null, secretTable = null;
     private DefaultTableModel buddyListData = null, secretListData = null;
+    public static File clientKeyFile;
+    public static PublicKey publicKey; 
 	JTextField creditsBox;
 	
     private int credits = 100;		// CHANGEME: Give them 100 credits for demonstration purposes
@@ -263,12 +274,12 @@ public class StealthNetClient {
             msgTextBox.append("[*ERR*] Already logged in.\n");
             return;
         }
-
         try {
             userID = JOptionPane.showInputDialog("Login:", userID);
             if (userID == null) return;
+            initClientKeyFile();
             stealthComms = new StealthNetComms();
-            stealthComms.initiateSession(new Socket(StealthNetComms.SERVERNAME, StealthNetComms.SERVERPORT));
+            stealthComms.initiateSession(new Socket(StealthNetComms.SERVERNAME, StealthNetComms.SERVERPORT), true);
             stealthComms.sendPacket(StealthNetPacket.CMD_LOGIN, userID);
             stealthTimer.start();
         } catch (UnknownHostException e) {
@@ -496,10 +507,43 @@ public class StealthNetClient {
         }
     }
 
+    private void initClientKeyFile(){
+    	clientKeyFile = new File("C:/Users/Andrew/Desktop/" + userID + "KeyFile.txt");
+    	PublicKey serverPublicKey = StealthNetComms.extractKey(); 
+    	BigInteger p = ((DHKey) serverPublicKey).getParams().getP();
+		BigInteger g = ((DHKey) serverPublicKey).getParams().getG();
+		int l = ((DHKey) serverPublicKey).getParams().getL();
+		try {
+			clientKeyFile.createNewFile();
+			// Use the values to generate a key pair
+			KeyPairGenerator keyGen = KeyPairGenerator.getInstance("DH");
+			DHParameterSpec dhSpec = new DHParameterSpec(p, g, l);
+			keyGen.initialize(dhSpec);
+			KeyPair keypair = keyGen.generateKeyPair();
+
+			// Get the generated public and private keys
+			PrivateKey privatekey = keypair.getPrivate();
+			PublicKey publickey = keypair.getPublic();
+			publicKey = publickey;
+			
+			byte[] privateKeyBytes = privatekey.getEncoded();
+			String server = "Server";
+			String pubKey = javax.xml.bind.DatatypeConverter.printBase64Binary(serverPublicKey.getEncoded());
+			String privKey = javax.xml.bind.DatatypeConverter.printBase64Binary(privateKeyBytes);
+			String seperator = ",";
+			FileOutputStream fos = new FileOutputStream("C:/Users/Andrew/Desktop/" + userID + "KeyFile.txt");
+			String output = server + seperator + pubKey + seperator + privKey + seperator + seperator;
+			byte[] toWrite = output.getBytes();
+			
+			fos.write(toWrite);
+		} catch (Exception e) {
+			System.out.println(e);
+		}
+    }
+    
     private void processPackets() {
 		// Update credits box, stick it here for convenience
 		creditsBox.setText(new Integer(credits).toString());
- 
         try {
             if ((stealthComms == null) || (!stealthComms.recvReady()))
                 return;
@@ -530,7 +574,7 @@ public class StealthNetClient {
                         iPort = new Integer(iAddr.substring(iAddr.lastIndexOf(":") + 1));
                         iAddr = iAddr.substring(0, iAddr.lastIndexOf(":"));
                         snComms = new StealthNetComms();
-                        snComms.initiateSession(new Socket(iAddr, iPort.intValue()));
+                        snComms.initiateSession(new Socket(iAddr, iPort.intValue()), false);
                         new StealthNetChat(userID, snComms).start();
                         break;
 
@@ -543,7 +587,7 @@ public class StealthNetClient {
                         iAddr = iAddr.substring(0, iAddr.lastIndexOf(":"));
 
                         snComms = new StealthNetComms();
-                        snComms.initiateSession(new Socket(iAddr, iPort.intValue()));
+                        snComms.initiateSession(new Socket(iAddr, iPort.intValue()), false);
 
                         FileDialog fileSave = new FileDialog(clientFrame, "Save As...", FileDialog.SAVE);
                         fileSave.setFile(fName);
@@ -611,7 +655,7 @@ public class StealthNetClient {
 						fName = fName.substring(0, fName.lastIndexOf("@"));
 
 						snComms = new StealthNetComms();
-						snComms.initiateSession(new Socket(iAddr, iPort.intValue()));
+						snComms.initiateSession(new Socket(iAddr, iPort.intValue()), false);
 
 						msgTextBox.append("[INFO] Sending out a secret.\n");
 

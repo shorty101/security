@@ -43,6 +43,9 @@ import java.math.*;
 public class StealthNetComms {
 	public static final String SERVERNAME = "localhost";
 	public static final int SERVERPORT = 5616;
+	public static final File initfile = new File("C:/Users/Andrew/Desktop/SNinit.txt");
+	public static File serverKeyFile = new File("C:/Users/Andrew/Desktop/ServerKeyFile.txt");
+	public static final PublicKey serverKey = extractKey();
 	public static final String STRSEP = ",";
 
 	private Socket commsSocket; // communications socket
@@ -61,7 +64,6 @@ public class StealthNetComms {
 		commsSocket = null;
 		dataIn = null;
 		dataOut = null;
-		//byte[] bytea = {0x0, 0x0};
 		nonce = 0;
 		othernonce = 0;
 		nonceSet = false;
@@ -76,13 +78,13 @@ public class StealthNetComms {
 			commsSocket.close();
 	}
 
-	public boolean initiateSession(Socket socket) {
+	public boolean initiateSession(Socket socket, boolean toServer) {
 		try {
 			commsSocket = socket;
 			dataOut = new PrintWriter(commsSocket.getOutputStream(), true);
 			dataIn = new BufferedReader(new InputStreamReader(commsSocket
 					.getInputStream()));
-			this.sendKeyInfo();
+			this.sendKeyInfo(toServer);
 		} catch (Exception e) {
 			System.err.println("Connection terminated.");
 			System.exit(1);
@@ -350,9 +352,55 @@ public class StealthNetComms {
 		}
 		return null;
 	}
+	
+	public SecretKey getSecretKey(String userID){
+		try {
+			File keyFile = StealthNetClient.clientKeyFile;
+			PublicKey clientPubKey = StealthNetClient.publicKey;
+			FileInputStream fstream = new FileInputStream(keyFile.getPath());
+			DataInputStream in = new DataInputStream(fstream);
+			BufferedReader br = new BufferedReader(new InputStreamReader(in));
+			int a = br.read();
+			String finalString = "";
+			while (a != -1)   {
+				finalString = finalString + (char) a;
+				a = br.read();
+			}
+			String[] userLines = finalString.split(",,");
+			for (int i = 0; i < userLines.length; i++){
+				String[] userInfo = userLines[i].split(",");
+				if (userInfo[0] == userID){
+					byte[] privateKeyBytes = javax.xml.bind.DatatypeConverter
+					.parseBase64Binary(userInfo[2]);
+					KeyAgreement ka = KeyAgreement.getInstance("DH");
+					PrivateKey privateKey = privateKeyBytes;
+					ka.init(privateKey);
+					ka.doPhase(clientPubKey, true);
 
-	public void sendKeyInfo() {
-		String[] values = genDhParams().split(",");
+					// Specify the type of key to generate;
+					String algorithm = "DESede";
+
+					// Generate the secret key
+					SecretKey secretKey = ka.generateSecret(algorithm);
+					sKey = secretKey;
+					encrypter = new TripleDESEncrypter(sKey);
+				}
+			}
+		} catch (Exception e){
+			System.out.println(e);
+			System.exit(1);
+		}
+		return null;
+	}
+
+	public void sendKeyInfo(boolean isServer) {
+		PublicKey clientPubKey = StealthNetClient.publicKey;
+		byte[] publicKeyBytes = clientPubKey.getEncoded();
+		dataOut.println(javax.xml.bind.DatatypeConverter.printBase64Binary(publicKeyBytes));
+		if (isServer == true) {
+			sKey = getSecretKey("Server");
+		}
+		/*String[] values = genDhParams().split(",");
 		BigInteger p = new BigInteger(values[0]);
 		BigInteger g = new BigInteger(values[1]);
 		int l = Integer.parseInt(values[2]);
@@ -374,6 +422,9 @@ public class StealthNetComms {
 					.printBase64Binary(publicKeyBytes));
 
 			// Get the publicKey from the other party
+			if (isServer = true) {
+				
+			}
 			byte[] publickeyBytes = javax.xml.bind.DatatypeConverter
 					.parseBase64Binary(dataIn.readLine());
 			X509EncodedKeySpec x509KeySpec = new X509EncodedKeySpec(
@@ -403,22 +454,58 @@ public class StealthNetComms {
             //nonce = md.digest();
             //nonce = 
             
-
+		*/
+		try {
 			String randomSeed = dataIn.readLine();
 			byte[] seed = javax.xml.bind.DatatypeConverter
-					.parseBase64Binary(encrypter.decrypt(randomSeed));
+				.parseBase64Binary(encrypter.decrypt(randomSeed));
 			random = new SecureRandom(seed);
 			nonce = random.nextLong();
 			nonceSet = true;
 			return;
-		} catch (InvalidKeySpecException e) {
+		} catch (Exception e) {
+			System.out.println(e);
+			System.exit(1);
+		}
+		/*} catch (InvalidKeySpecException e) {
 		} catch (InvalidKeyException e) {
 		} catch (java.security.InvalidAlgorithmParameterException e) {
 		} catch (java.security.NoSuchAlgorithmException e) {
 		} catch (IOException e) {
-		}
+		}*/
 	}
+
 	
+	public static PublicKey extractKey(){
+		try{
+			FileInputStream fstream = new FileInputStream(initfile.getPath());
+			// Get the object of DataInputStream
+			DataInputStream in = new DataInputStream(fstream);
+			BufferedReader br = new BufferedReader(new InputStreamReader(in));
+			String finalString = "";
+			int a = br.read();
+			
+			while (a != -1)   {
+				// Print the content on the console
+				//strLine.substring(6);
+				finalString = finalString + (char) a;
+				a = br.read();
+			}
+			
+			finalString = finalString.substring(finalString.indexOf(",")+1);
+			byte[] keyBytes = javax.xml.bind.DatatypeConverter.parseBase64Binary(finalString);
+			X509EncodedKeySpec x509KeySpec = new X509EncodedKeySpec(keyBytes);
+			KeyFactory keyFact = KeyFactory.getInstance("DH");
+			PublicKey publicKey = keyFact.generatePublic(x509KeySpec);
+			//Close the input stream
+			in.close();
+			return publicKey;
+		} catch (Exception e) {
+			System.out.println(e);
+			System.exit(1);
+		}
+		return null;
+	}
 }
 
 /*******************************************************************************
