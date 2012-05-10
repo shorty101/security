@@ -44,6 +44,7 @@ public class StealthNetComms {
 	public static final String SERVERNAME = "localhost";
 	public static final int SERVERPORT = 5616;
 	public static final String STRSEP = ",";
+	public static final String HEADSEP = "!";
 
 	private Socket commsSocket; // communications socket
 	private PrintWriter dataOut; // output data stream
@@ -203,11 +204,9 @@ public class StealthNetComms {
 	public boolean sendPacket(StealthNetPacket pckt) {
 		if (dataOut == null)
 			return false;
-		//byte randhead[] = new byte[8];
-		//Random header for entropy
 		SecureRandom sr = new SecureRandom();
-		String str = Long.toHexString(sr.nextLong()).substring(0, 8); //Random header
-		str = str.concat(STRSEP);
+		String str = Long.toHexString(sr.nextLong()).substring(0, 10); //Random header
+		str = str.concat(HEADSEP);
 		str = str.concat(pckt.toString());
 		str = str.concat(STRSEP);
 		Date date = new Date();
@@ -247,17 +246,11 @@ public class StealthNetComms {
 	}
 
 	public StealthNetPacket recvPacket() throws IOException {
-		
-		//int macOffset = 24;
-		//int nonceOffset = 16; //40 byte hex representation. Inefficient, but don't have to deal with NULL etc
-		//int baseOffset = 8; //8 bytes random header for entropy
 		StealthNetPacket pckt = null;
 		String str = dataIn.readLine();
 		String decrypted = encrypter.decrypt(str, random);
-		decrypted = decrypted.substring(8); //Not a hack; no magic numbers here!
-		if (decrypted.charAt(0) == ',') {
-			decrypted = decrypted.substring(1);
-		}
+		decrypted = decrypted.split(HEADSEP)[1]; //Strip random header that may be corrupted
+
 		String[] sarr = decrypted.split(STRSEP);
 		String message = sarr[0];
 		long messageDate = new BigInteger(sarr[1], 16).longValue();
