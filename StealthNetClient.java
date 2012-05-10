@@ -21,12 +21,15 @@
 /* Import Libraries **********************************************************/
 
 import java.io.*;
+import java.math.BigInteger;
 import java.net.*;
 import javax.swing.*;
 import javax.swing.table.*;
 import java.awt.*;
 import java.awt.event.*;
 import java.security.SecureRandom;
+import java.security.interfaces.RSAPublicKey;
+import java.security.spec.RSAPublicKeySpec;
 import java.util.Hashtable;
 
 /* StealthNetClient Class Definition *****************************************/
@@ -42,7 +45,13 @@ public class StealthNetClient {
     private JTable buddyTable = null, secretTable = null;
     private DefaultTableModel buddyListData = null, secretListData = null;
 	JTextField creditsBox;
-	private final static String defaultFile = "C:/stealthnet.txt";
+	//private final static String defaultFile = "C:/stealthnet.txt";
+	private final BigInteger serverMod = 
+			new BigInteger("20782787173762731228221560793184277311486335214070337155854804478858101086247824390049197181832159245577555779219855414634439395203923316975994364623073145700461123018358626191655578586668249695034575025882676101246536078936666054741126946084921344253707101698268557906668309106160476993013855462935152075469833054780696688733684279064964562426690119194129898391464050906105704476272569904165115645435458277103290404587372738539505344917709222862084316529105712722832889675983001885971961443244328389605146211109626101338590602714488312291024345909859735609958444051810949492112745342087756126201535317937795787830493");
+	private final BigInteger serverPub = new BigInteger("65537");
+	//private final RSAPublicKey serverKey = new RSAPublicKey();
+	private final RSAPublicKeySpec serverSpec = new RSAPublicKeySpec(serverMod, serverPub);
+	
 	
     private int credits = 100;		// FIXME: Give them 100 credits for demonstration purposes
 
@@ -290,9 +299,10 @@ public class StealthNetClient {
 
         try {
         	guiUserId();
-        	StealthnetKeyPair skp = getpw();
+        	StealthnetKeyPair mypair = getpw();
+        	StealthnetKeyPair server = new StealthnetKeyPair(serverSpec);
             if (userID == null) return;
-            stealthComms = new StealthNetComms(skp);
+            stealthComms = new StealthNetComms(mypair, server);
             stealthComms.initiateSession(new Socket(StealthNetComms.SERVERNAME, StealthNetComms.SERVERPORT));
             stealthComms.sendPacket(StealthNetPacket.CMD_LOGIN, userID);
             stealthTimer.start();

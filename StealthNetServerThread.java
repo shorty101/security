@@ -22,6 +22,13 @@
 
 import java.io.*;
 import java.net.*;
+import java.security.KeyFactory;
+import java.security.NoSuchAlgorithmException;
+import java.security.interfaces.RSAPrivateKey;
+import java.security.interfaces.RSAPublicKey;
+import java.security.spec.InvalidKeySpecException;
+import java.security.spec.RSAPrivateKeySpec;
+import java.security.spec.RSAPublicKeySpec;
 import java.util.*;
 
 /* StealthNetServerThread Class Definition ***********************************/
@@ -43,12 +50,18 @@ public class StealthNetServerThread extends Thread {
     static private Hashtable userList = new Hashtable();
     static private Hashtable secretList = new Hashtable();
     
+//    private RSAPrivateKey privateKey;
+//    private RSAPublicKey publicKey;
+    
     private String userID = null;
     private StealthNetComms stealthComms = null;
+	//private final RSAPublicKeySpec serverPub = new RSAPublicKeySpec(serverMod, serverPubbi);
 
-    public StealthNetServerThread(Socket socket) {
-        super("StealthNetServerThread");
-        stealthComms = new StealthNetComms();
+    public StealthNetServerThread(Socket socket, RSAPublicKeySpec publicSpec, RSAPrivateKeySpec privateSpec) {
+    	super("StealthNetServerThread");
+
+    	StealthnetKeyPair mypair = new StealthnetKeyPair(publicSpec, privateSpec);
+    	stealthComms = new StealthNetComms(mypair);
         stealthComms.acceptSession(socket);
     }
 
