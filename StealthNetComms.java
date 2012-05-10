@@ -57,15 +57,24 @@ public class StealthNetComms {
 	private boolean nonceSet;
 	private long othernonce;
 	private long lastdate;
+	private StealthnetKeyPair otherpub;
+	private StealthnetKeyPair mypair;
+
+	public StealthNetComms(StealthnetKeyPair mypair) {
+		this.mypair = mypair;
+		commsSocket = null;
+		dataIn = null;
+		dataOut = null;
+		nonce = 0;
+		othernonce = 0;
+	}
 
 	public StealthNetComms() {
 		commsSocket = null;
 		dataIn = null;
 		dataOut = null;
-		//byte[] bytea = {0x0, 0x0};
 		nonce = 0;
 		othernonce = 0;
-		nonceSet = false;
 	}
 
 	protected void finalize() throws IOException {
@@ -276,7 +285,7 @@ public class StealthNetComms {
 	        long noncein = new BigInteger(messageNonce, 16).longValue();
 			if (othernonce+1 == noncein) {
 	        	othernonce++;
-	        } else if (othernonce == 0) {
+	        } else if (othernonce == 0 && nonceSet == false) {
 	        	nonceSet = true;
 	        	othernonce = new BigInteger(messageNonce, 16).longValue();
 	        	System.out.println("setting othernonce to " + Long.toHexString(othernonce));
@@ -363,8 +372,15 @@ public class StealthNetComms {
 
 			// Send the public key bytes to the other party
 			byte[] publicKeyBytes = publicKey.getEncoded();
-			dataOut.println(javax.xml.bind.DatatypeConverter
-					.printBase64Binary(publicKeyBytes));
+			String str = javax.xml.bind.DatatypeConverter
+					.printBase64Binary(publicKeyBytes);
+			byte[] signature = otherpub.signMessage(str);
+			//FIXME
+			str = str.concat(STRSEP);
+			str = str.concat(javax.xml.bind.DatatypeConverter
+			.printBase64Binary(signature));
+			
+			dataOut.println();
 
 			// Get the publicKey from the other party
 			byte[] publickeyBytes = javax.xml.bind.DatatypeConverter

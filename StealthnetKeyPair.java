@@ -46,6 +46,7 @@ public class StealthnetKeyPair {
 		byte[] decrypted = null;
 		String[] contents = {null, null, null, null};
 		if (file.exists()) {
+			System.out.println("Opening key file "+filename);
 			decrypted = crypt.decrypt(file, password);
 			contents = processContents(decrypted);
 		}

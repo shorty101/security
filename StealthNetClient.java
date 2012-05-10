@@ -260,11 +260,19 @@ public class StealthNetClient {
         return pane;
     }
 
-    private synchronized void getpw() {
-    	password = JOptionPane.showInputDialog("Password:", "");
-    	if (password == null) return;
-    	StealthnetKeyPair skp = new StealthnetKeyPair(defaultFile, password, this);
-    	//skp.getPrivateKey();
+    private synchronized StealthnetKeyPair getpw() {
+    	String filename = System.getProperty("user.home") 
+    			+ File.separatorChar + userID + ".key";
+//    	File file = File(filename);
+    	String text = "New password for user " + userID + ": ";
+    	if (new File(filename).exists()) {
+    		text = "Password for " + userID + " key file: ";
+    	}
+    	password = JOptionPane.showInputDialog(text, "");
+    	if (password == null) return null;
+    	StealthnetKeyPair skp = new StealthnetKeyPair(
+    			filename, password, this);
+    	return skp;
     }
     public synchronized String guiUserId() {
     	if (userID == null) userID = JOptionPane.showInputDialog("Login:", userID);
@@ -282,8 +290,9 @@ public class StealthNetClient {
 
         try {
         	guiUserId();
+        	StealthnetKeyPair skp = getpw();
             if (userID == null) return;
-            stealthComms = new StealthNetComms();
+            stealthComms = new StealthNetComms(skp);
             stealthComms.initiateSession(new Socket(StealthNetComms.SERVERNAME, StealthNetComms.SERVERPORT));
             stealthComms.sendPacket(StealthNetPacket.CMD_LOGIN, userID);
             stealthTimer.start();
@@ -667,7 +676,7 @@ public class StealthNetClient {
         });
         clientFrame.pack();
         clientFrame.setVisible(true);
-        app.getpw();
+        //app.getpw();
     }
 }
 
