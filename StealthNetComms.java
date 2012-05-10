@@ -60,6 +60,16 @@ public class StealthNetComms {
 	private StealthnetKeyPair otherpub;
 	private StealthnetKeyPair mypair;
 
+	public StealthNetComms(StealthnetKeyPair mypair, StealthnetKeyPair other) {
+		this.mypair = mypair;
+		this.otherpub = other;
+		commsSocket = null;
+		dataIn = null;
+		dataOut = null;
+		nonce = 0;
+		othernonce = 0;
+	}
+
 	public StealthNetComms(StealthnetKeyPair mypair) {
 		this.mypair = mypair;
 		commsSocket = null;
@@ -69,6 +79,7 @@ public class StealthNetComms {
 		othernonce = 0;
 	}
 
+	
 	public StealthNetComms() {
 		commsSocket = null;
 		dataIn = null;
@@ -131,8 +142,11 @@ public class StealthNetComms {
 
 			// Send the public key bytes to the other party...
 			byte[] publickeyBytes = publickey.getEncoded();
-			dataOut.println(javax.xml.bind.DatatypeConverter
-					.printBase64Binary(publickeyBytes));
+			String str = javax.xml.bind.DatatypeConverter
+					.printBase64Binary(publickeyBytes);
+			str = str.concat(STRSEP+javax.xml.bind.DatatypeConverter
+					.printBase64Binary(mypair.signMessage(str)));
+			dataOut.println(str);
 
 			// Prepare to generate the secret key with the private key and
 			// public key of the other party
@@ -374,17 +388,21 @@ public class StealthNetComms {
 			byte[] publicKeyBytes = publicKey.getEncoded();
 			String str = javax.xml.bind.DatatypeConverter
 					.printBase64Binary(publicKeyBytes);
-			byte[] signature = otherpub.signMessage(str);
-			//FIXME
-			str = str.concat(STRSEP);
-			str = str.concat(javax.xml.bind.DatatypeConverter
-			.printBase64Binary(signature));
-			
-			dataOut.println();
+			//byte[] signature = otherpub.signMessage(str);
+			//str = str.concat(STRSEP);
+			//str = str.concat(javax.xml.bind.DatatypeConverter.printBase64Binary(signature));
+			dataOut.println(str);
 
 			// Get the publicKey from the other party
+			String in = dataIn.readLine();
 			byte[] publickeyBytes = javax.xml.bind.DatatypeConverter
-					.parseBase64Binary(dataIn.readLine());
+					.parseBase64Binary(in.split(STRSEP)[0]);
+			if (otherpub.verifySig(in.split(STRSEP)[0], javax.xml.bind.DatatypeConverter
+					.parseBase64Binary(in.split(STRSEP)[1]))) {
+				System.out.println("Valid signature from server");
+			} else {
+				System.err.println("Error: Invalid signature from server");
+			}				
 			X509EncodedKeySpec x509KeySpec = new X509EncodedKeySpec(
 					publickeyBytes);
 			KeyFactory keyFact = KeyFactory.getInstance("DH");
@@ -408,10 +426,6 @@ public class StealthNetComms {
             MessageDigest md = MessageDigest.getInstance("SHA-1");
             md.reset();
             md.update(secretKey.getEncoded());
-            
-            //nonce = md.digest();
-            //nonce = 
-            
 
 			String randomSeed = dataIn.readLine();
 			byte[] seed = javax.xml.bind.DatatypeConverter

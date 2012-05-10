@@ -37,6 +37,30 @@ public class StealthnetKeyPair {
 		String wanted = contentsStr.split(HEADSEP)[1];
 		return wanted.split(STRSEP);
 	}
+
+	public StealthnetKeyPair(RSAPublicKeySpec publicSpec, RSAPrivateKeySpec privateSpec) {
+		try {
+			KeyFactory kf = KeyFactory.getInstance("RSA");
+			publicKey  = (RSAPublicKey) kf.generatePublic(publicSpec);
+			privateKey = (RSAPrivateKey) kf.generatePrivate(privateSpec);
+		} catch (NoSuchAlgorithmException e) {
+			e.printStackTrace();
+		} catch (InvalidKeySpecException e) {
+			e.printStackTrace();
+		}
+	}
+	
+	public StealthnetKeyPair(RSAPublicKeySpec spec) {
+		privateKey = null;
+		try {
+			KeyFactory kf = KeyFactory.getInstance("RSA");
+			publicKey  = (RSAPublicKey) kf.generatePublic(spec);
+		} catch (NoSuchAlgorithmException e) {
+			e.printStackTrace();
+		} catch (InvalidKeySpecException e) {
+			e.printStackTrace();
+		}
+	}
 	
 	public StealthnetKeyPair(String filename, String password, StealthNetClient client) {
 		PBEEncrypter crypt = new PBEEncrypter();
@@ -108,7 +132,7 @@ public class StealthnetKeyPair {
 	public boolean verifySig(String message, byte[] sig) {
 		byte[] messageBytes = message.getBytes();
 		try {
-			Signature signature = Signature.getInstance("SHA1withRSA", "BC");
+			Signature signature = Signature.getInstance("SHA1withRSA");
 			signature.initVerify(publicKey);
 			signature.update(messageBytes);
 			return (signature.verify(sig));
@@ -118,13 +142,15 @@ public class StealthnetKeyPair {
 			e.printStackTrace();
 		} catch (NoSuchAlgorithmException e) {
 			e.printStackTrace();
-		} catch (NoSuchProviderException e) {
-			e.printStackTrace();
 		}
 		return false;
 	}
 
 	public byte[] signMessage(String message) {
+		if (privateKey == null) {
+			System.err.println("Error: tried to sign message with public key");
+			return null;
+		}
 		byte[] sigBytes = null;
 		try {
 			Signature signature = Signature.getInstance("SHA1withRSA");
