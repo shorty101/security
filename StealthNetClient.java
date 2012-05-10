@@ -38,11 +38,13 @@ public class StealthNetClient {
     private StealthNetComms stealthComms = null;
     private javax.swing.Timer stealthTimer;
     private String userID = null;
+    private String password = null;
     private JTable buddyTable = null, secretTable = null;
     private DefaultTableModel buddyListData = null, secretListData = null;
 	JTextField creditsBox;
+	private final static String defaultFile = "C:/stealthnet.txt";
 	
-    private int credits = 100;		// CHANGEME: Give them 100 credits for demonstration purposes
+    private int credits = 100;		// FIXME: Give them 100 credits for demonstration purposes
 
 	private class SecretData {
 		String description = null;
@@ -258,6 +260,20 @@ public class StealthNetClient {
         return pane;
     }
 
+    private synchronized void getpw() {
+    	password = JOptionPane.showInputDialog("Password:", "");
+    	if (password == null) return;
+    	StealthnetKeyPair skp = new StealthnetKeyPair(defaultFile, password, this);
+    	//skp.getPrivateKey();
+    }
+    public synchronized String guiUserId() {
+    	if (userID == null) userID = JOptionPane.showInputDialog("Login:", userID);
+    	return userID;
+    }
+    public synchronized void setUserId(String newID) {
+    	userID = newID;
+    }
+    
     private synchronized void login() {
         if (stealthComms != null) {
             msgTextBox.append("[*ERR*] Already logged in.\n");
@@ -265,7 +281,7 @@ public class StealthNetClient {
         }
 
         try {
-            userID = JOptionPane.showInputDialog("Login:", userID);
+        	guiUserId();
             if (userID == null) return;
             stealthComms = new StealthNetComms();
             stealthComms.initiateSession(new Socket(StealthNetComms.SERVERNAME, StealthNetComms.SERVERPORT));
@@ -651,6 +667,7 @@ public class StealthNetClient {
         });
         clientFrame.pack();
         clientFrame.setVisible(true);
+        app.getpw();
     }
 }
 
