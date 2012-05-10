@@ -35,12 +35,15 @@ public class PBEEncrypter {
 		} catch (IOException e) {
 			e.printStackTrace();
 		}
-		encrypt(filename, contents.getBytes(), password);
+		encrypt(filename, contents, password);
 	}
 	
-	public void encrypt(String filename, byte[] contents, String password){
+	public void encrypt(String filename, String contents, String password){
 		try{
-			System.out.println(contents.toString());
+			byte[] cont = contents.getBytes("UTF-8");
+			String str = javax.xml.bind.DatatypeConverter.printBase64Binary(cont);
+			byte[] b64 = javax.xml.bind.DatatypeConverter.parseBase64Binary(str);
+			System.out.println(str);
 			
 			setSalt();
 			// Create PBE parameter set
@@ -59,12 +62,11 @@ public class PBEEncrypter {
 			Mac mac = Mac.getInstance(hmacAlgorithm);
 			mac.init(pbeKey);
 
-			byte[] digest = mac.doFinal(contents);
-			System.out.println(contents.toString());
+			byte[] digest = mac.doFinal(b64);
 			System.out.println("MAC: " + javax.xml.bind.DatatypeConverter.printBase64Binary(digest));
-			byte[] clearMAC = new byte [contents.length + digest.length];
-			System.arraycopy(contents, 0, clearMAC, 0, contents.length);
-			System.arraycopy(digest, 0, clearMAC, contents.length, digest.length);
+			byte[] clearMAC = new byte [b64.length + digest.length];
+			System.arraycopy(b64, 0, clearMAC, 0, b64.length);
+			System.arraycopy(digest, 0, clearMAC, b64.length, digest.length);
 			System.out.println("ClearMAC: " + javax.xml.bind.DatatypeConverter.printBase64Binary(clearMAC));
 			// Encrypt the cleartext 		
 			byte[] ciphertext = pbeCipher.doFinal(clearMAC);
@@ -120,7 +122,7 @@ public class PBEEncrypter {
 	public byte[] decrypt(File file, String password) {
 		try{
 			System.out.println("DECRYPT");
-			byte[] cipherlesssalt = new byte[(int) file.length() - 28];
+			byte[] cipherlesssalt = new byte[(int) file.length() - 8];
 			byte[] ciphertext = new byte[(int) file.length()];
 			byte[] filesalt = new byte[8];
 			char[] pwchar = password.toCharArray();
@@ -149,11 +151,13 @@ public class PBEEncrypter {
 			
 			byte[] MAC = new byte[20];
 			byte[] clearMAC = pbeCipher.doFinal(cipherlesssalt);
-			System.out.println();
+			System.out.println("ClearMAC: " + javax.xml.bind.DatatypeConverter.printBase64Binary(clearMAC));
 			byte[] cleartext = new byte[clearMAC.length - 20];
 			System.arraycopy(clearMAC, clearMAC.length - 20, MAC, 0, 20);
 			System.arraycopy(clearMAC, 0, cleartext, 0, clearMAC.length - 20);
-
+			
+			System.out.println("Cleartext: " + javax.xml.bind.DatatypeConverter.printBase64Binary(cleartext));
+			
 			Mac mac = Mac.getInstance(hmacAlgorithm);
 			mac.init(pbeKey);
 			byte[] digest = mac.doFinal(cleartext);

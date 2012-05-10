@@ -126,7 +126,7 @@ public class StealthnetKeyPair {
 		System.out.println(str);
 		PBEEncrypter crypt = new PBEEncrypter();
 
-		crypt.encrypt(filename, str.getBytes(), password);
+		crypt.encrypt(filename, str, password);
 	}
 
 	public boolean verifySig(String message, byte[] sig) {
@@ -171,7 +171,7 @@ public class StealthnetKeyPair {
 //		StealthnetKeyPair skp = new StealthnetKeyPair(filename, "fruit", new StealthNetClient());
 //		skp.saveKeys(filename);
 		PBEEncrypter crypt = new PBEEncrypter();
-		crypt.encrypt(filename, "hello".getBytes(), "Test");
+		crypt.encrypt(filename, "hello", "Test");
 		System.out.println(crypt.decrypt(new File(filename), "Test"));
 
 	}
