@@ -129,12 +129,11 @@ public class StealthnetKeyPair {
 		crypt.encrypt(filename, str, password);
 	}
 
-	public boolean verifySig(String message, byte[] sig) {
-		byte[] messageBytes = message.getBytes();
+	public boolean verifySig(byte[] message, byte[] sig) {
 		try {
 			Signature signature = Signature.getInstance("SHA1withRSA");
 			signature.initVerify(publicKey);
-			signature.update(messageBytes);
+			signature.update(message);
 			return (signature.verify(sig));
 		} catch (SignatureException e) {
 			e.printStackTrace();
@@ -146,7 +145,7 @@ public class StealthnetKeyPair {
 		return false;
 	}
 
-	public byte[] signMessage(String message) {
+	public byte[] signMessage(byte[] message) {
 		if (privateKey == null) {
 			System.err.println("Error: tried to sign message with public key");
 			return null;
@@ -155,6 +154,7 @@ public class StealthnetKeyPair {
 		try {
 			Signature signature = Signature.getInstance("SHA1withRSA");
 			signature.initSign(privateKey, new SecureRandom());
+		    signature.update(message);
 			sigBytes = signature.sign();
 		} catch (InvalidKeyException e) {
 			e.printStackTrace();

@@ -144,8 +144,11 @@ public class StealthNetComms {
 			byte[] publickeyBytes = publickey.getEncoded();
 			String str = javax.xml.bind.DatatypeConverter
 					.printBase64Binary(publickeyBytes);
+			byte[] sig = mypair.signMessage(publickeyBytes);
+			System.out.println(mypair.verifySig(publickeyBytes, sig));
 			str = str.concat(STRSEP+javax.xml.bind.DatatypeConverter
-					.printBase64Binary(mypair.signMessage(str)));
+					.printBase64Binary(sig));
+			System.out.println(str);
 			dataOut.println(str);
 
 			// Prepare to generate the secret key with the private key and
@@ -397,8 +400,9 @@ public class StealthNetComms {
 			String in = dataIn.readLine();
 			byte[] publickeyBytes = javax.xml.bind.DatatypeConverter
 					.parseBase64Binary(in.split(STRSEP)[0]);
-			if (otherpub.verifySig(in.split(STRSEP)[0], javax.xml.bind.DatatypeConverter
-					.parseBase64Binary(in.split(STRSEP)[1]))) {
+			byte[] sig = javax.xml.bind.DatatypeConverter
+					.parseBase64Binary(in.split(STRSEP)[1]);
+			if (otherpub.verifySig(publickeyBytes, sig)) {
 				System.out.println("Valid signature from server");
 			} else {
 				System.err.println("Error: Invalid signature from server");
