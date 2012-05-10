@@ -40,19 +40,9 @@ public class PBEEncrypter {
 	
 	public void encrypt(String filename, String contents, String password){
 		try{
-//			File file = new File(defaultFile);
-//			byte[] cleartext = new byte[(int) file.length()];
-//			FileInputStream fileInputStream = new FileInputStream(file);
-//			fileInputStream.read(cleartext);
+			byte[] b64 = javax.xml.bind.DatatypeConverter.parseBase64Binary(contents);
 			System.out.println(contents);
-			String b64 = javax.xml.bind.DatatypeConverter
-					.printBase64Binary(contents.getBytes());
-			System.out.println(b64);
-			System.out.println(b64.getBytes());
-
-			byte[] cleartext = contents.getBytes();
-			System.out.println(contents.getBytes());
-
+			
 			setSalt();
 			// Create PBE parameter set
 			pbeParamSpec = new PBEParameterSpec(salt, count);
@@ -69,13 +59,13 @@ public class PBEEncrypter {
 
 			Mac mac = Mac.getInstance(hmacAlgorithm);
 			mac.init(pbeKey);
-			byte[] utf8 = cleartext;
-			byte[] digest = mac.doFinal(utf8);
+
+			byte[] digest = mac.doFinal(b64);
 			System.out.println("MAC: " + javax.xml.bind.DatatypeConverter
 					.printBase64Binary(digest));
-			byte[] clearMAC = new byte [cleartext.length + digest.length];
-			System.arraycopy(cleartext, 0, clearMAC, 0, cleartext.length);
-			System.arraycopy(digest, 0, clearMAC, cleartext.length, digest.length);
+			byte[] clearMAC = new byte [b64.length + digest.length];
+			System.arraycopy(b64, 0, clearMAC, 0, b64.length);
+			System.arraycopy(digest, 0, clearMAC, b64.length, digest.length);
 
 			// Encrypt the cleartext 		
 			byte[] ciphertext = pbeCipher.doFinal(clearMAC);
@@ -83,12 +73,14 @@ public class PBEEncrypter {
 			byte[] cipherplussalt = new byte[ciphertext.length + 8];
 			System.arraycopy(salt, 0, cipherplussalt, 0, salt.length);
 			System.arraycopy(ciphertext, 0, cipherplussalt, salt.length, ciphertext.length);
-			File newFile = new File(filename + "enc");
+			File newFile = new File(filename);
 			newFile.createNewFile();
-			FileOutputStream fos = new FileOutputStream(filename + "enc");
-			fos.write(salt);
-			fos.write(ciphertext);
-			javax.xml.bind.DatatypeConverter.printBase64Binary(ciphertext);
+			FileOutputStream fos = new FileOutputStream(filename);
+			fos.write(cipherplussalt);
+//			fos.write(salt);
+//			fos.write(b64);
+			System.out.println(javax.xml.bind.DatatypeConverter.printBase64Binary(salt));
+			System.out.println(javax.xml.bind.DatatypeConverter.printBase64Binary(ciphertext));
 			fos.close();
 		} catch (IOException i) {
 			System.out.println(i);
@@ -129,14 +121,18 @@ public class PBEEncrypter {
 	public byte[] decrypt(File file, String password) {
 		try{
 			byte[] cipherlesssalt = new byte[(int) file.length() - 8];
-//			byte[] ciphertext = new byte[(int) file.length()];
+			byte[] ciphertext = new byte[(int) file.length()];
 			byte[] filesalt = new byte[8];
 			char[] pwchar = password.toCharArray();
 			FileInputStream fileInputStream = new FileInputStream(file);
-			fileInputStream.read(filesalt);
-			fileInputStream.read(cipherlesssalt);
-//			System.arraycopy(ciphertext, 0, filesalt, 0, 8);
-//			System.arraycopy(ciphertext, 8, cipherlesssalt, 0, cipherlesssalt.length);
+			fileInputStream.read(ciphertext);
+			System.arraycopy(ciphertext, 0, filesalt, 0, 8);
+			System.arraycopy(ciphertext, 8, cipherlesssalt, 0, cipherlesssalt.length);
+			String plain = javax.xml.bind.DatatypeConverter.printBase64Binary(cipherlesssalt);
+			
+			System.out.println(plain);
+			System.out.println(javax.xml.bind.DatatypeConverter.printBase64Binary(filesalt));
+
 			pbeParamSpec = new PBEParameterSpec(filesalt, count);
 
 			pbeKeySpec = new PBEKeySpec(pwchar);
@@ -165,7 +161,7 @@ public class PBEEncrypter {
 			} else {
 				System.err.println("File "+file.toString()+ " has been altered");
 				System.err.println("Hash " + actualMAC + " expected " + expectedMAC);
-				System.err.println("CT " + cleartext);
+				System.err.println("CT " + plain);
 				
 				System.exit(1);
 			}

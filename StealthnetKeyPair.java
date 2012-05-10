@@ -146,7 +146,7 @@ public class StealthnetKeyPair {
 //		skp.saveKeys(filename);
 		PBEEncrypter crypt = new PBEEncrypter();
 		crypt.encrypt(filename, "hello", "Test");
-		System.out.println(crypt.decrypt(new File(filename + "enc"), "Test"));
+		System.out.println(crypt.decrypt(new File(filename), "Test"));
 
 	}
 }
