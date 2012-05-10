@@ -35,13 +35,12 @@ public class PBEEncrypter {
 		} catch (IOException e) {
 			e.printStackTrace();
 		}
-		encrypt(filename, contents, password);
+		encrypt(filename, contents.getBytes(), password);
 	}
 	
-	public void encrypt(String filename, String contents, String password){
+	public void encrypt(String filename, byte[] contents, String password){
 		try{
-			byte[] b64 = javax.xml.bind.DatatypeConverter.parseBase64Binary(contents);
-			System.out.println(contents);
+			System.out.println(contents.toString());
 			
 			setSalt();
 			// Create PBE parameter set
@@ -60,13 +59,13 @@ public class PBEEncrypter {
 			Mac mac = Mac.getInstance(hmacAlgorithm);
 			mac.init(pbeKey);
 
-			byte[] digest = mac.doFinal(b64);
-			System.out.println("MAC: " + javax.xml.bind.DatatypeConverter
-					.printBase64Binary(digest));
-			byte[] clearMAC = new byte [b64.length + digest.length];
-			System.arraycopy(b64, 0, clearMAC, 0, b64.length);
-			System.arraycopy(digest, 0, clearMAC, b64.length, digest.length);
-
+			byte[] digest = mac.doFinal(contents);
+			System.out.println(contents.toString());
+			System.out.println("MAC: " + javax.xml.bind.DatatypeConverter.printBase64Binary(digest));
+			byte[] clearMAC = new byte [contents.length + digest.length];
+			System.arraycopy(contents, 0, clearMAC, 0, contents.length);
+			System.arraycopy(digest, 0, clearMAC, contents.length, digest.length);
+			System.out.println("ClearMAC: " + javax.xml.bind.DatatypeConverter.printBase64Binary(clearMAC));
 			// Encrypt the cleartext 		
 			byte[] ciphertext = pbeCipher.doFinal(clearMAC);
 
@@ -79,8 +78,8 @@ public class PBEEncrypter {
 			fos.write(cipherplussalt);
 //			fos.write(salt);
 //			fos.write(b64);
-			System.out.println(javax.xml.bind.DatatypeConverter.printBase64Binary(salt));
-			System.out.println(javax.xml.bind.DatatypeConverter.printBase64Binary(ciphertext));
+			System.out.println("Salt: " + javax.xml.bind.DatatypeConverter.printBase64Binary(salt));
+			System.out.println("Ciphertext: " + javax.xml.bind.DatatypeConverter.printBase64Binary(ciphertext));
 			fos.close();
 		} catch (IOException i) {
 			System.out.println(i);
@@ -120,7 +119,8 @@ public class PBEEncrypter {
 	
 	public byte[] decrypt(File file, String password) {
 		try{
-			byte[] cipherlesssalt = new byte[(int) file.length() - 8];
+			System.out.println("DECRYPT");
+			byte[] cipherlesssalt = new byte[(int) file.length() - 28];
 			byte[] ciphertext = new byte[(int) file.length()];
 			byte[] filesalt = new byte[8];
 			char[] pwchar = password.toCharArray();
@@ -130,8 +130,8 @@ public class PBEEncrypter {
 			System.arraycopy(ciphertext, 8, cipherlesssalt, 0, cipherlesssalt.length);
 			String plain = javax.xml.bind.DatatypeConverter.printBase64Binary(cipherlesssalt);
 			
-			System.out.println(plain);
-			System.out.println(javax.xml.bind.DatatypeConverter.printBase64Binary(filesalt));
+			System.out.println("Cipherlesssalt: " + plain);
+			System.out.println("Salt: " + javax.xml.bind.DatatypeConverter.printBase64Binary(filesalt));
 
 			pbeParamSpec = new PBEParameterSpec(filesalt, count);
 
@@ -146,17 +146,21 @@ public class PBEEncrypter {
 			// Initialize PBE Cipher with key and parameters
 			pbeCipher.init(Cipher.DECRYPT_MODE, pbeKey, pbeParamSpec);
 
+			
+			byte[] MAC = new byte[20];
 			byte[] clearMAC = pbeCipher.doFinal(cipherlesssalt);
-			byte[] MAC = new byte[16];
-			byte[] cleartext = new byte[clearMAC.length - 16];
-			System.arraycopy(clearMAC, clearMAC.length - 16, MAC, 0, 16);
-			System.arraycopy(clearMAC, 0, cleartext, 0, clearMAC.length - 16);
+			System.out.println();
+			byte[] cleartext = new byte[clearMAC.length - 20];
+			System.arraycopy(clearMAC, clearMAC.length - 20, MAC, 0, 20);
+			System.arraycopy(clearMAC, 0, cleartext, 0, clearMAC.length - 20);
 
 			Mac mac = Mac.getInstance(hmacAlgorithm);
 			mac.init(pbeKey);
 			byte[] digest = mac.doFinal(cleartext);
 			String expectedMAC = javax.xml.bind.DatatypeConverter.printBase64Binary(digest);
+			System.out.println("ExpectedMAC: " + expectedMAC);
 			String actualMAC = javax.xml.bind.DatatypeConverter.printBase64Binary(MAC);
+			System.out.println("ActualMAC: " + actualMAC);
 			if (expectedMAC.equals(actualMAC)) {
 			} else {
 				System.err.println("File "+file.toString()+ " has been altered");
