@@ -57,7 +57,7 @@ public class StealthnetKeyPair {
 			client.setUserId(userID);
 		}
 		if (contents[1] == null || contents[2] == null) { //Generate new key pair
-			System.out.println("Generating new public/private key");
+			System.out.println("Generating new public/private key for " + filename);
 			try {
 				KeyPairGenerator kpg;
 				kpg = KeyPairGenerator.getInstance("RSA");
@@ -99,6 +99,7 @@ public class StealthnetKeyPair {
 		str = str.concat(privateKey.getPrivateExponent().toString());
 		str = str.concat(STRSEP);
 		str = str.concat(publicKey.getPublicExponent().toString());
+		System.out.println(str);
 		PBEEncrypter crypt = new PBEEncrypter();
 
 		crypt.encrypt(filename, str, password);
@@ -137,5 +138,15 @@ public class StealthnetKeyPair {
 			e1.printStackTrace();
 		}
 		return sigBytes;
+	}
+	
+	public static void main(String[] args) {
+		String filename = System.getProperty("user.home") + File.separatorChar + "test.txt";
+//		StealthnetKeyPair skp = new StealthnetKeyPair(filename, "fruit", new StealthNetClient());
+//		skp.saveKeys(filename);
+		PBEEncrypter crypt = new PBEEncrypter();
+		crypt.encrypt(filename, "hello", "Test");
+		System.out.println(crypt.decrypt(new File(filename + "enc"), "Test"));
+
 	}
 }

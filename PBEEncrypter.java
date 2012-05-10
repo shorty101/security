@@ -13,8 +13,7 @@ public class PBEEncrypter {
 	private byte[] salt = new byte[8];
 	private final static String cipherAlgorithm = "PBEWithMD5AndTripleDES";
 	private final static String hmacAlgorithm = "HmacSHA1";
-//	private final static String defaultFile = "C:/stealthnet.txt"; //"C:/Users/Andrew/Desktop/EncryptedTest.txt"
-
+	private final static String defaultFile =System.getProperty("user.home") + File.separatorChar + "test.txt";
 	private void setSalt(){
 		r.nextBytes(salt);
 	}
@@ -41,10 +40,19 @@ public class PBEEncrypter {
 	
 	public void encrypt(String filename, String contents, String password){
 		try{
-			//byte[] cleartext = new byte[(int) file.length()];
-			//FileInputStream fileInputStream = new FileInputStream(file);
-			//fileInputStream.read(cleartext);
+//			File file = new File(defaultFile);
+//			byte[] cleartext = new byte[(int) file.length()];
+//			FileInputStream fileInputStream = new FileInputStream(file);
+//			fileInputStream.read(cleartext);
+			System.out.println(contents);
+			String b64 = javax.xml.bind.DatatypeConverter
+					.printBase64Binary(contents.getBytes());
+			System.out.println(b64);
+			System.out.println(b64.getBytes());
+
 			byte[] cleartext = contents.getBytes();
+			System.out.println(contents.getBytes());
+
 			setSalt();
 			// Create PBE parameter set
 			pbeParamSpec = new PBEParameterSpec(salt, count);
@@ -75,10 +83,12 @@ public class PBEEncrypter {
 			byte[] cipherplussalt = new byte[ciphertext.length + 8];
 			System.arraycopy(salt, 0, cipherplussalt, 0, salt.length);
 			System.arraycopy(ciphertext, 0, cipherplussalt, salt.length, ciphertext.length);
-			File newFile = new File(filename);
+			File newFile = new File(filename + "enc");
 			newFile.createNewFile();
-			FileOutputStream fos = new FileOutputStream(filename);
-			fos.write(cipherplussalt);
+			FileOutputStream fos = new FileOutputStream(filename + "enc");
+			fos.write(salt);
+			fos.write(ciphertext);
+			javax.xml.bind.DatatypeConverter.printBase64Binary(ciphertext);
 			fos.close();
 		} catch (IOException i) {
 			System.out.println(i);
@@ -119,13 +129,14 @@ public class PBEEncrypter {
 	public byte[] decrypt(File file, String password) {
 		try{
 			byte[] cipherlesssalt = new byte[(int) file.length() - 8];
-			byte[] ciphertext = new byte[(int) file.length()];
+//			byte[] ciphertext = new byte[(int) file.length()];
 			byte[] filesalt = new byte[8];
 			char[] pwchar = password.toCharArray();
 			FileInputStream fileInputStream = new FileInputStream(file);
-			fileInputStream.read(ciphertext);
-			System.arraycopy(ciphertext, 0, filesalt, 0, 8);
-			System.arraycopy(ciphertext, 8, cipherlesssalt, 0, cipherlesssalt.length);
+			fileInputStream.read(filesalt);
+			fileInputStream.read(cipherlesssalt);
+//			System.arraycopy(ciphertext, 0, filesalt, 0, 8);
+//			System.arraycopy(ciphertext, 8, cipherlesssalt, 0, cipherlesssalt.length);
 			pbeParamSpec = new PBEParameterSpec(filesalt, count);
 
 			pbeKeySpec = new PBEKeySpec(pwchar);
@@ -152,17 +163,20 @@ public class PBEEncrypter {
 			String actualMAC = javax.xml.bind.DatatypeConverter.printBase64Binary(MAC);
 			if (expectedMAC.equals(actualMAC)) {
 			} else {
-				System.err
-				.println("File has been altered, things are unsafe yo.");
+				System.err.println("File "+file.toString()+ " has been altered");
+				System.err.println("Hash " + actualMAC + " expected " + expectedMAC);
+				System.err.println("CT " + cleartext);
+				
 				System.exit(1);
 			}
 
+			File newFile = new File(defaultFile);
+			newFile.createNewFile();
+			FileOutputStream fos = new FileOutputStream(defaultFile);
+			fos.write(cleartext);
+			fos.close();
 			return cleartext;
-//			File newFile = new File(defaultFile);
-//			newFile.createNewFile();
-//			FileOutputStream fos = new FileOutputStream(defaultFile);
-//			fos.write(cleartext);
-//			fos.close();
+
 		} catch (IOException i) {
 			System.out.println(i);
 		} catch (NoSuchAlgorithmException n){
